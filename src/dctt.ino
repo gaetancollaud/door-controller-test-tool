@@ -1,3 +1,4 @@
+#include <Arduino.h>
 /*
 Copyright (C) 2014 Axis Communications
 This program is free software; you can redistribute it and/or
@@ -110,26 +111,26 @@ int last_free_ram = 0;
 class WebServeraJsonStream : public aJsonStream {
 public:
   WebServeraJsonStream(WebServer* webserver_): aJsonStream(NULL), webserver(webserver_) {}
-  
-  virtual bool available()  { 
+
+  virtual bool available()  {
     if (bucket != EOF)
-      return true; 
-    return webserver->available(); 
+      return true;
+    return webserver->available();
   }
 
 private:
   virtual size_t write(uint8_t ch) { return webserver->write(ch); }
-  virtual int getch() { 
+  virtual int getch() {
     int retVal = bucket;
     if (retVal != EOF) {
       bucket = EOF;
-    } 
+    }
     else {
       retVal = webserver->read();
       if (retVal == -1)
         retVal = EOF;
     }
-    return retVal; 
+    return retVal;
   }
 
   WebServer* webserver;
@@ -145,7 +146,7 @@ typedef enum Command
     PUSHREX,
     ACTIVATEINPUT,
     DEACTIVATEINPUT,
-    GETPERIPHERALSTATE,  
+    GETPERIPHERALSTATE,
     UNDEFINED,
 };
 
@@ -153,7 +154,7 @@ typedef enum Command
 * Mounts the SD card.
 */
 void setupSDCard() {
-  
+
   // Disable ethernet shield SPI while setting up SD
   pinMode(ETHERNET_SELECT_PIN, OUTPUT);
   digitalWrite(ETHERNET_SELECT_PIN, HIGH);
@@ -161,8 +162,8 @@ void setupSDCard() {
   if(!SD.begin(SD_CARD_SELECT_PIN)) {
     cout << F(" failed.\n");
     while (true) delay(100); // Don't continue if we fail.
-  }  
-  else { 
+  }
+  else {
     cout << F(" OK.\n");
   } // SD.begin() returns with its SPI disabled, so no need to do it ourselves.
 }
@@ -173,7 +174,7 @@ void setupSDCard() {
 void freeMem() {
   int freeRam = sys.ramFree();
   if (last_free_ram != freeRam) {
-    cout << F("Free RAM: ") << freeRam << F(" bytes (") 
+    cout << F("Free RAM: ") << freeRam << F(" bytes (")
          << sys.ramSize() << F(" total).") << endl;
     last_free_ram = freeRam;
   }
@@ -185,7 +186,7 @@ void freeMem() {
 */
 void sendFile(WebServer &server, const char* type, const char* filename)
 {
-  
+
   byte txBuffer[FILE_TX_BUFFER_SIZE];
   int bytesRead = 0;
   P(could_not_open_file) = "Could not open file: ";
@@ -197,10 +198,10 @@ void sendFile(WebServer &server, const char* type, const char* filename)
     server.print(filename);
     return;
   }
-  // Opening of file was successful, so send correct content 
+  // Opening of file was successful, so send correct content
   // type and start sending the file in "chunks".
   server.httpSuccess(type);
-  while (fileStream.available()) 
+  while (fileStream.available())
   {
     txBuffer[bytesRead] = fileStream.read();
     bytesRead++;
@@ -209,13 +210,13 @@ void sendFile(WebServer &server, const char* type, const char* filename)
     {
       server.write(txBuffer, FILE_TX_BUFFER_SIZE);
       bytesRead = 0;
-    }                
-  }    
+    }
+  }
   if(bytesRead > 0) {
-    server.write(txBuffer, bytesRead); 
-  }    
-  server.printCRLF();        
-  fileStream.close();  
+    server.write(txBuffer, bytesRead);
+  }
+  server.printCRLF();
+  fileStream.close();
 }
 
 /*
@@ -226,7 +227,7 @@ void receiveFile(WebServer &server, const char* filename)
   byte txBuffer[FILE_TX_BUFFER_SIZE];
   int bytesRead = 0;
   P(could_not_open_file) = "Could not open file: ";
-  
+
   if (SD.exists((char*) filename))
     SD.remove((char*) filename);
 
@@ -237,22 +238,22 @@ void receiveFile(WebServer &server, const char* filename)
     server.print(filename);
     return;
   }
-  
+
   int c = server.read();
   // Opening of file was successful
-  while (c != -1) 
+  while (c != -1)
   {
     fileStream.write(c);
     c = server.read();
-  }    
-  
-  fileStream.close();  
+  }
+
+  fileStream.close();
 }
 
 /* *****************************************************************************************************
-* 
+*
 * Configuration Section
-* 
+*
 ***************************************************************************************************** */
 
 /*
@@ -265,9 +266,9 @@ void waitForData(Stream& stream, int timeout) {
 }
 
 /*
-* Find the next quotation-mark, and read all bytes until quotation-mark 
+* Find the next quotation-mark, and read all bytes until quotation-mark
 * after that.
-*/   
+*/
 bool getNextToken(Stream& stream, char* tokenBuffer, uint8_t length) {
 
   stream.find("\"");
@@ -280,7 +281,7 @@ bool getNextToken(Stream& stream, char* tokenBuffer, uint8_t length) {
     return false;
 }
 
-// An enum to keep track of what we are parsing, when loading 
+// An enum to keep track of what we are parsing, when loading
 // the door configuration file.
 // We put the enum in its oown namespace to prevent poluting
 // the global one.
@@ -295,20 +296,20 @@ namespace Cfg {
 
 /*
 * This function is used to load the pin mappings from the configuration-
-* file on the SD card. Each pin has a 3 character long id, which is stored 
-* in an array. This array is needed for lookup as the door configuration 
+* file on the SD card. Each pin has a 3 character long id, which is stored
+* in an array. This array is needed for lookup as the door configuration
 * file references these id:s, instead of the actual pin numbers.
 *
-* A custom parser is needed as there is not enough memory to load the entire 
+* A custom parser is needed as there is not enough memory to load the entire
 * config file into memory.
 */
 bool loadPinMappingsFromFile(const char* filename) {
 
   Cfg::PinType cfgPinType = Cfg::DIGITAL;
   const uint8_t tokenBufferLength = 4;
-  char tokenBuffer[tokenBufferLength] = "";  
+  char tokenBuffer[tokenBufferLength] = "";
   bool parsingSucceeded = false;
-  int i = 0;    
+  int i = 0;
   uint8_t pin;
 
   File fileStream;
@@ -317,9 +318,9 @@ bool loadPinMappingsFromFile(const char* filename) {
     fileStream = SD.open(filename, FILE_WRITE);
     if (!fileStream) {
       cout << F("Error opening ") << filename << endl;
-      return false;    
+      return false;
     }
-    
+
     char buf[16];
     for (i = 0; i < 70; i++) {
       switch (i)
@@ -327,7 +328,7 @@ bool loadPinMappingsFromFile(const char* filename) {
         case 0:
           strcpy(buf, "{\"0\":\"RSV\"");
           break;
-          
+
         case 1:
         case 4:
         case 10:
@@ -337,7 +338,7 @@ bool loadPinMappingsFromFile(const char* filename) {
         case 53:
           sprintf(buf, ",\"%d\":\"RSV\"", i);
           break;
-          
+
         default:
           if (i < 54)
             sprintf(buf, ",\"%d\":\"N/A\"", i);
@@ -349,19 +350,19 @@ bool loadPinMappingsFromFile(const char* filename) {
     fileStream.write('}');
     fileStream.close();
   }
-  
+
   // Open the file.
-  fileStream = SD.open(filename);    
+  fileStream = SD.open(filename);
   if (!fileStream) {
     cout << F("Error opening ") << filename << endl;
     return false;
-  }  
-  
-  while (true) {           
+  }
+
+  while (true) {
 
     if (cfgPinType == Cfg::DIGITAL) {
       // Get the digital pin number.
-      getNextToken(fileStream, tokenBuffer, tokenBufferLength); 
+      getNextToken(fileStream, tokenBuffer, tokenBufferLength);
       pin = (uint8_t)atoi(tokenBuffer);
 
       // Make sure that the parsed pin is "correct", i.e. in numerical order.
@@ -370,20 +371,20 @@ bool loadPinMappingsFromFile(const char* filename) {
         break;
       }
       // Get the pin id and save to array.
-      getNextToken(fileStream, tokenBuffer, tokenBufferLength);            
-      strcpy(digitalPins[i], tokenBuffer);  
+      getNextToken(fileStream, tokenBuffer, tokenBufferLength);
+      strcpy(digitalPins[i], tokenBuffer);
       digitalPins[i][3] = '\0';
-    }   
-    else if (cfgPinType == Cfg::ANALOG) { 
+    }
+    else if (cfgPinType == Cfg::ANALOG) {
       // Get the analog pin number.
-      getNextToken(fileStream, tokenBuffer, tokenBufferLength); 
+      getNextToken(fileStream, tokenBuffer, tokenBufferLength);
 
       // Convert it to the actual analog pin number.
       uint8_t parsedPin;
       if (strcmp(tokenBuffer, "A0") == 0) parsedPin = A0;
       else if (strcmp(tokenBuffer, "A1") == 0) parsedPin = A1;
       else if (strcmp(tokenBuffer, "A2") == 0) parsedPin = A2;
-      else if (strcmp(tokenBuffer, "A3") == 0) parsedPin = A3;      
+      else if (strcmp(tokenBuffer, "A3") == 0) parsedPin = A3;
       else if (strcmp(tokenBuffer, "A4") == 0) parsedPin = A4;
       else if (strcmp(tokenBuffer, "A5") == 0) parsedPin = A5;
       else if (strcmp(tokenBuffer, "A6") == 0) parsedPin = A6;
@@ -402,17 +403,17 @@ bool loadPinMappingsFromFile(const char* filename) {
       }
 
       // Get the pin id and save to array.
-      getNextToken(fileStream, tokenBuffer, tokenBufferLength);      
+      getNextToken(fileStream, tokenBuffer, tokenBufferLength);
       strcpy(analogPins[i], tokenBuffer);
       analogPins[i][3] = '\0';
-    } 
-    
+    }
+
     // If we have parsed the last analog pin, we are finished!
     if ((cfgPinType == Cfg::ANALOG) && (i == 15))  {
       fileStream.close();
       parsingSucceeded = true;
       break;
-    }      
+    }
     // If we have parsed the last digital pin, switch to parsing the analog ones.
     else if (i == 53) {
       cfgPinType = Cfg::ANALOG;
@@ -423,7 +424,7 @@ bool loadPinMappingsFromFile(const char* filename) {
       i++;
     }
   }
-  
+
   // Close the file and return if we succeeded or not.
   fileStream.close();
   return (parsingSucceeded ? true : false);
@@ -437,9 +438,9 @@ uint8_t getPinNumber(char* pinId) {
   for (int i=0;i<=53;i++) {
       if (strcmp(digitalPins[i], pinId) == 0) {
         return i;
-      }      
+      }
   }
-  
+
   // If we didn't find a match there, we check the analog
   // pins.
   for (int i=0;i<=15;i++) {
@@ -462,7 +463,7 @@ uint8_t getPinNumber(char* pinId) {
           case 14: return A14;
           case 15: return A15;
         }
-      }      
+      }
   }
   // If we find nothing...
   cout << F("No matching pin number found for pin id ") << pinId << endl;
@@ -490,76 +491,76 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
   uint8_t openBraces = 0;
   Cfg::Pos cfgPos = Cfg::DOOR;
   Cfg::Pos cfgParent = Cfg::NONE;
-    
-  // Create temporary PACS-objects with rubbish values. 
-  // These will receive proper values during parsing.  
-  PACSDoor* tempDoor = doorManager.createDoor("temp");  
+
+  // Create temporary PACS-objects with rubbish values.
+  // These will receive proper values during parsing.
+  PACSDoor* tempDoor = doorManager.createDoor("temp");
   PACSReader tempReader("temprdr", 255, 255);
   PACSPeripheral tempPeripheral("tempper", GREENLED, 255, LOW);
-  
+
   // Keep parsing while there are more tokens in stream.
   while(getNextToken(stream, token, tokenLength)) {
-    
+
     // Check if we've parsed the entire door.
     if (strcmp(token, stopToken) == 0) {
       // We return false to specify that there are more doors.
       return 1;
     }
-   
-    // 
+
+    //
     // "CONTAINERS"
-    //  
+    //
     else if (strcmp(token, "Reader") == 0) {
       cfgPos = Cfg::READER;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }     
-    else if (strcmp(token, "REX") == 0) {         
+    }
+    else if (strcmp(token, "REX") == 0) {
       cfgPos = Cfg::REX;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }     
-    else if (strcmp(token, "DoorMonitor") == 0) {   
+    }
+    else if (strcmp(token, "DoorMonitor") == 0) {
       cfgPos = Cfg::DOOR_MONITOR;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }     
-    else if (strcmp(token, "Lock") == 0) {   
+    }
+    else if (strcmp(token, "Lock") == 0) {
       cfgPos = Cfg::LOCK;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }     
-    else if (strcmp(token, "Input") == 0) {   
+    }
+    else if (strcmp(token, "Input") == 0) {
       cfgPos = Cfg::DIGITAL_INPUT;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }     
-    else if (strcmp(token, "Output") == 0) {   
+    }
+    else if (strcmp(token, "Output") == 0) {
       cfgPos = Cfg::DIGITAL_OUTPUT;
-      cfgParent = Cfg::DOOR;  
+      cfgParent = Cfg::DOOR;
       openBraces = 0;
-    }         
-    //     
+    }
+    //
     //  "SUB-CONTAINERS"
     //
-    else if (strcmp(token, "Wiegand") == 0) {   
+    else if (strcmp(token, "Wiegand") == 0) {
       cfgPos = Cfg::WIEGAND;
-      cfgParent = Cfg::READER;  
-    }     
-    else if (strcmp(token, "GreenLED") == 0) {   
+      cfgParent = Cfg::READER;
+    }
+    else if (strcmp(token, "GreenLED") == 0) {
       cfgPos = Cfg::GREEN_LED;
-      cfgParent = Cfg::READER;  
-    }     
-    else if (strcmp(token, "Beeper") == 0) {   
+      cfgParent = Cfg::READER;
+    }
+    else if (strcmp(token, "Beeper") == 0) {
       cfgPos = Cfg::BEEPER;
-      cfgParent = Cfg::READER;  
-    }     
-    // 
+      cfgParent = Cfg::READER;
+    }
+    //
     // STRING/INT OBJECTS
-    //  
-    else if (strcmp(token, "Id") == 0) {   
+    //
+    else if (strcmp(token, "Id") == 0) {
       getNextToken(stream, token, tokenLength);
-      switch (cfgPos) {      
+      switch (cfgPos) {
         case Cfg::DOOR:
           strcpy(tempDoor->id, token);
           break;
@@ -574,11 +575,11 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
         case Cfg::DIGITAL_INPUT:
         case Cfg::DIGITAL_OUTPUT:
           strcpy(tempPeripheral.id, token);
-      } 
-    } 
+      }
+    }
     else if (strcmp(token, "Pin") == 0) {
-      getNextToken(stream, token, tokenLength);          
-      switch (cfgPos) {      
+      getNextToken(stream, token, tokenLength);
+      switch (cfgPos) {
         case Cfg::GREEN_LED:
         case Cfg::BEEPER:
         case Cfg::DOOR_MONITOR:
@@ -590,31 +591,31 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
           if (!isValidPin) {
             return -1;
           }
-      } 
+      }
     }
     else if (strcmp(token, "Pin0") == 0) {
-      getNextToken(stream, token, tokenLength);    
-      switch (cfgPos) {          
-        case Cfg::WIEGAND:                             
+      getNextToken(stream, token, tokenLength);
+      switch (cfgPos) {
+        case Cfg::WIEGAND:
           tempReader.pin0 = getPinNumber(token);
           if (!isValidPin) {
             return -1;
           }
-      } 
+      }
     }
     else if (strcmp(token, "Pin1") == 0) {
-      getNextToken(stream, token, tokenLength);      
-      switch (cfgPos) {      
-        case Cfg::WIEGAND:                 
+      getNextToken(stream, token, tokenLength);
+      switch (cfgPos) {
+        case Cfg::WIEGAND:
           tempReader.pin1 = getPinNumber(token);
           if (!isValidPin) {
             return -1;
           }
-      } 
+      }
     }
     else if (strcmp(token, "ActiveLevel") == 0) {
       getNextToken(stream, token, tokenLength);
-      switch (cfgPos) {      
+      switch (cfgPos) {
         case Cfg::DOOR_MONITOR:
         case Cfg::REX:
         case Cfg::LOCK:
@@ -633,7 +634,7 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
 
     // Token is parsed. Now we need to traverse the container.
     while ((stream.available()) && (stream.peek() != '"')) {
-      
+
       switch (stream.read()) {
         case ']':
           cfgPos = Cfg::DOOR;
@@ -646,51 +647,51 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
           openBraces--;
 
           // Closing Curly brace means an object has "ended", which
-          // means we can save something.                  
+          // means we can save something.
           if (cfgParent == Cfg::READER) {
-            switch (cfgPos) {              
+            switch (cfgPos) {
               case Cfg::WIEGAND:
-                tempDoor->addReader(tempReader.id, 
-                                    tempReader.pin0, 
-                                    tempReader.pin1);                                     
+                tempDoor->addReader(tempReader.id,
+                                    tempReader.pin0,
+                                    tempReader.pin1);
                 break;
               case Cfg::GREEN_LED:
-                tempDoor->addPeripheral(tempPeripheral.id, 
-                                        GREENLED, 
-                                        tempPeripheral.pin, 
-                                        tempPeripheral.activeLevel);                
+                tempDoor->addPeripheral(tempPeripheral.id,
+                                        GREENLED,
+                                        tempPeripheral.pin,
+                                        tempPeripheral.activeLevel);
 
                 break;
               case Cfg::BEEPER:
-                tempDoor->addPeripheral(tempPeripheral.id, 
-                                        BEEPER, 
-                                        tempPeripheral.pin, 
-                                        tempPeripheral.activeLevel);                   
+                tempDoor->addPeripheral(tempPeripheral.id,
+                                        BEEPER,
+                                        tempPeripheral.pin,
+                                        tempPeripheral.activeLevel);
                 break;
             }
             // Move the parse position up a level.
             cfgPos = Cfg::READER;
-            cfgParent = Cfg::DOOR;                        
+            cfgParent = Cfg::DOOR;
           }
           else if (cfgParent == Cfg::DOOR) {
             switch (cfgPos) {
               case Cfg::DOOR_MONITOR:
-                tempDoor->addPeripheral(tempPeripheral.id, 
-                                        DOORMONITOR, 
-                                        tempPeripheral.pin, 
+                tempDoor->addPeripheral(tempPeripheral.id,
+                                        DOORMONITOR,
+                                        tempPeripheral.pin,
                                         tempPeripheral.activeLevel);
                 break;
               case Cfg::REX:
-                tempDoor->addPeripheral(tempPeripheral.id, 
-                                        REX, 
-                                        tempPeripheral.pin, 
+                tempDoor->addPeripheral(tempPeripheral.id,
+                                        REX,
+                                        tempPeripheral.pin,
                                         tempPeripheral.activeLevel);
 
                 break;
               case Cfg::LOCK:
-                tempDoor->addPeripheral(tempPeripheral.id, 
-                                        LOCK, 
-                                        tempPeripheral.pin, 
+                tempDoor->addPeripheral(tempPeripheral.id,
+                                        LOCK,
+                                        tempPeripheral.pin,
                                         tempPeripheral.activeLevel);
                 break;
               case Cfg::DIGITAL_INPUT:
@@ -722,23 +723,23 @@ int parseDoor(Stream& stream, char* startToken, char* stopToken) {
 /*
 * Opens the door config file for reading and sends the doors it is comprised of
 * for parsing, one at a time.
-*/ 
+*/
 bool parsDoorConfiguration(Stream& stream) {
 
-  const uint8_t MAX_NO_OF_DOORS = 16;  
-  uint8_t currentDoor = 1;    
+  const uint8_t MAX_NO_OF_DOORS = 16;
+  uint8_t currentDoor = 1;
   char conversionBuffer[3];
   bool doorsAvailable = true;
-  
+
   cout << F("Parsing door: ");
 
   // Parse the door objects (as many as we can find, up
-  // to the defined maximum).  
-  while(doorsAvailable == 1) {  
+  // to the defined maximum).
+  while(doorsAvailable == 1) {
 
     // Construct the start/stop door-number string, e.g. "DOOR3", "DOOR4"
-    char currentDoorToken[10] = "DOOR";    
-    char nextDoorToken[10] = "DOOR";    
+    char currentDoorToken[10] = "DOOR";
+    char nextDoorToken[10] = "DOOR";
     itoa(currentDoor, conversionBuffer, 10);
     strcat(currentDoorToken, conversionBuffer);
     itoa(currentDoor+1, conversionBuffer, 10);
@@ -748,11 +749,11 @@ bool parsDoorConfiguration(Stream& stream) {
 
     // Check if there's a door config entry for this door number.
     // If there is, we create a door and start parsing it.
-    waitForData(stream, 1000);              
+    waitForData(stream, 1000);
 
     // Do the actual parsing of the door.
-    doorsAvailable = parseDoor(stream, currentDoorToken, nextDoorToken);        
-    
+    doorsAvailable = parseDoor(stream, currentDoorToken, nextDoorToken);
+
     // Check if there was an error while parsing.
     if (doorsAvailable == -1) {
       return false;
@@ -763,8 +764,8 @@ bool parsDoorConfiguration(Stream& stream) {
       return false;
     }
     else {
-      currentDoor++;      
-    }    
+      currentDoor++;
+    }
   }
 
   cout << endl;
@@ -773,11 +774,11 @@ bool parsDoorConfiguration(Stream& stream) {
 }
 
 /*
-* This function loads the door configuration, which should be in 
-* JSON format. 
-* 
-* It must be structured in a certain way, specified in the documentation. 
-* A custom parser is needed as there is not enough memory to load the entire 
+* This function loads the door configuration, which should be in
+* JSON format.
+*
+* It must be structured in a certain way, specified in the documentation.
+* A custom parser is needed as there is not enough memory to load the entire
 * config file into memory.
 */
 bool loadDoorConfigurationFromFile(const char* filename) {
@@ -790,7 +791,7 @@ bool loadDoorConfigurationFromFile(const char* filename) {
   if (!doorCfgFile) {
     cout << F("Error opening ") << filename << endl;
     return false;
-  }         
+  }
 
   parsingSucceeded = parsDoorConfiguration(doorCfgFile);
   doorCfgFile.close();
@@ -801,24 +802,24 @@ bool loadDoorConfigurationFromFile(const char* filename) {
 /*
 * Print a sumamry of the configured doors and peripherals to serial.
 */
-void printDoorConfiguration() {  
+void printDoorConfiguration() {
     for (unsigned i=0; i < doorManager.doors.size(); i++) {
         std::cout << "Door:" << std::endl
                   << "  Id: " << doorManager.doors[i].id << std::endl;
-        
+
         std::cout << "Wiegand:\n";
         for (unsigned j=0; j < doorManager.doors[i].readers.size(); j++) {
-          std::cout << "  Id: " << doorManager.doors[i].readers[j].id << 
+          std::cout << "  Id: " << doorManager.doors[i].readers[j].id <<
                        " Pin0: " << (int)doorManager.doors[i].readers[j].pin0 <<
-                       " Pin1: " << (int)doorManager.doors[i].readers[j].pin1 
+                       " Pin1: " << (int)doorManager.doors[i].readers[j].pin1
                     << std::endl;
-        } 
+        }
 
         std::cout << "Peripherals:\n";
         for (unsigned j=0; j < doorManager.doors[i].peripherals.size(); j++) {
-          std::cout << "  Id: " << doorManager.doors[i].peripherals[j].id << 
+          std::cout << "  Id: " << doorManager.doors[i].peripherals[j].id <<
                        " Pin: " << (int)doorManager.doors[i].peripherals[j].pin <<
-                       " ActiveLevel: " << (int)doorManager.doors[i].peripherals[j].activeLevel 
+                       " ActiveLevel: " << (int)doorManager.doors[i].peripherals[j].activeLevel
                     << std::endl;
         }
         std::cout << std::endl;
@@ -826,9 +827,9 @@ void printDoorConfiguration() {
 }
 
 /* *****************************************************************************************************
-* 
-* Webserver Section 
-* 
+*
+* Webserver Section
+*
 ***************************************************************************************************** */
 
 /*
@@ -840,7 +841,7 @@ void errorHTML(WebServer &server, WebServer::ConnectionType type, char *url_tail
 
   if (type == WebServer::HEAD)
     return;
-  
+
   server.print(F("<html><head><title>HTTP 400</title></head><body>\n"));
   server.print(F("<h2>HTTP 400 - Bad Request</h2>\n"));
   server.print(F("<p>The request cannot be fulfilled due to bad syntax.</p>\n"));
@@ -852,41 +853,41 @@ void errorHTML(WebServer &server, WebServer::ConnectionType type, char *url_tail
 */
 void webAppJsonFile(WebServer &server, WebServer::ConnectionType type, char **url_path, char *url_tail, bool tail_complete)
 {
-  
-  if (type == WebServer::GET) 
+
+  if (type == WebServer::GET)
     cout << F("Client is GETting file: ");
   else if (type == WebServer::POST)
     cout << F("Client is POSTting file: ");
-  else  
+  else
     cout << F("Client is ???ing file: ");
-  cout << *url_path << endl; 
-  
+  cout << *url_path << endl;
+
   if (strcmp(*url_path, "networksettings.json") == 0)
   {
     aJsonObject *root = NULL;
-    WebServeraJsonStream webstream(&server);  
-  
+    WebServeraJsonStream webstream(&server);
+
     //doors.json
     //pins.json
-    
+
     if (type == WebServer::GET) {
-        
+
       root = aJson.createObject();
       network.settingsToJSON(root);
-    
+
       // send correct content type
       server.httpSuccess("application/json");
-      aJson.print(root, &webstream);            
-      server.printCRLF(); 
+      aJson.print(root, &webstream);
+      server.printCRLF();
     }
     else if (type == WebServer::POST) {
-  
+
       root = aJson.parse(&webstream);
       network.settingsFromJSON(root);
       network.printConfiguration();
-      
+
     }
-    
+
     if (root != NULL) {
       aJson.deleteItem(root);
     }
@@ -914,7 +915,7 @@ void webAppJsonFile(WebServer &server, WebServer::ConnectionType type, char **ur
     server.print(F("<p>The requested object can not be found.</p>\n"));
     server.print(F("</body></html>"));
   }
-    
+
 }
 
 /*
@@ -925,45 +926,45 @@ void webAppFile(WebServer &server, WebServer::ConnectionType type, char **url_pa
 {
   // For a HEAD request, we just stop after outputting headers.
   if (type == WebServer::HEAD)
-    return;  
+    return;
 
   // Check if requested file is one we are serving on SD card.
   if (strcmp(*url_path, "index.htm") == 0 || strcmp(*url_path, "app.js") == 0 ||
-    strcmp(*url_path, "keypad.mp3") == 0 || strcmp(*url_path, "favicon.ico") == 0) 
-  {  
-    cout << F("Client is requesting file: ") << *url_path << endl;      
-    
-    // Create a full filename path. 32 characters should be 
+    strcmp(*url_path, "keypad.mp3") == 0 || strcmp(*url_path, "favicon.ico") == 0)
+  {
+    cout << F("Client is requesting file: ") << *url_path << endl;
+
+    // Create a full filename path. 32 characters should be
     // enough for 8+3 filenames and the folder structure we have.
     char fullFilename[32];
     sprintf(fullFilename, "web/%s", *url_path);
 
     // It was successfully opened, so send the client a http 200 with correct
     // content type depending on the file.
-    if (strcmp(*url_path, "app.js") == 0) {      
+    if (strcmp(*url_path, "app.js") == 0) {
       sendFile(server, "text/javascript; charset=utf-8", fullFilename);
     }
-    else if (strcmp(*url_path, "keypad.mp3") == 0) {    
+    else if (strcmp(*url_path, "keypad.mp3") == 0) {
       sendFile(server, "audio/mpeg", fullFilename);
     }
-    else if (strcmp(*url_path, "favicon.ico") == 0) {    
+    else if (strcmp(*url_path, "favicon.ico") == 0) {
       sendFile(server, "image/x-icon", fullFilename);
     }
     else {
       sendFile(server, "text/html; charset=utf-8", fullFilename);
-    }    
+    }
 
   }
   else if ((*url_path, ".json") != 0)
   {
     webAppJsonFile(server, type, url_path, url_tail, tail_complete);
   }
-  
+
   // If we didn't get a match for any of the files we serve, we send the client
   // a http 4xx error.
   else {
     errorHTML(server, type, url_tail, tail_complete);
-  }  
+  }
 
 }
 
@@ -987,12 +988,12 @@ void apiResponse(bool requestSuccessful, const unsigned char* message) {
    webserver->httpSuccess();
   }
   webserver->printP(message);
-  webserver->printCRLF();           
+  webserver->printCRLF();
 }
 
 /*
- * This is the api route for sending http commands. 
- * Three post parameters need to be specified: 
+ * This is the api route for sending http commands.
+ * Three post parameters need to be specified:
  *    cmd (the action to be performed, must come first!)
  *    doorId (id of the target door)
  *    id (id of the target peripheral)
@@ -1002,7 +1003,7 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
 {
 
   URLPARAM_RESULT urlParamResult;
-  Command cmd = UNDEFINED;  
+  Command cmd = UNDEFINED;
   char name[32], value[32];
   bool postParamsAvailable;
   char id[16] = {'\0'};
@@ -1025,28 +1026,28 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
 
   // If we receive a http-post, we assume the request is sent with json-data.
   if (type == WebServer::POST) {  }
-  
+
   // If we receive a http-get, we assume the request was issued with URL parameters.
-  if (type == WebServer::GET) {    
-    
+  if (type == WebServer::GET) {
+
     // Parse the URL parameters.
     do {
-        urlParamResult = server.nextURLparam(&url_tail, name, 32, value, 32);      
+        urlParamResult = server.nextURLparam(&url_tail, name, 32, value, 32);
         if ((urlParamResult == URLPARAM_OK) && name && value) {
-        
+
         // The cmd parameter's value tells us what action to perform.
-        if (strcmp(name, "cmd") == 0) {                                      
+        if (strcmp(name, "cmd") == 0) {
           if (strcmp(value, "swipecard") == 0) cmd = SWIPECARD;
           else if (strcmp(value, "enterpin") == 0) cmd = ENTERPIN;
           else if (strcmp(value, "opendoor") == 0) cmd = OPENDOOR;
           else if (strcmp(value, "closedoor") == 0) cmd = CLOSEDOOR;
           else if (strcmp(value, "pushrex") == 0) cmd = PUSHREX;
           else if (strcmp(value, "activateinput") == 0) cmd = ACTIVATEINPUT;
-          else if (strcmp(value, "deactivateinput") == 0) cmd = DEACTIVATEINPUT;          
+          else if (strcmp(value, "deactivateinput") == 0) cmd = DEACTIVATEINPUT;
           else if (strcmp(value, "getperipheralstate") == 0) cmd = GETPERIPHERALSTATE;
           else cmd = UNDEFINED;
         }
-        // 
+        //
         else if (strcmp(name, "facilitycode") == 0) {
           if (value && (cmd == SWIPECARD)) {
             facilityCode = atoi(value);
@@ -1054,12 +1055,12 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
         }
         else if (strcmp(name, "cardnumber") == 0) {
           if (value && (cmd == SWIPECARD)) {
-            cardNumber = atol(value);           
-          }  
+            cardNumber = atol(value);
+          }
         }
         else if (strcmp(name, "pin") == 0) {
           if (value && (cmd == ENTERPIN)) {
-            strcpy(pin, value);             
+            strcpy(pin, value);
           }
         }
         else if (strcmp(name, "doorid") == 0) {
@@ -1074,91 +1075,91 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
         }
       }
     } while (urlParamResult != URLPARAM_EOS);
-      
-    // Now we see what command was issued, find the door and 
+
+    // Now we see what command was issued, find the door and
     // reader/peripheral and perform it.
     switch (cmd) {
       // SwipeCard Command
       case SWIPECARD:
           // First check that the input parameters are there.
-          if ((facilityCode == -1) || (cardNumber == -1)) {            
+          if ((facilityCode == -1) || (cardNumber == -1)) {
             apiResponse(false, card_not_specified);
             return;
-          }          
+          }
           // Then check that the input parameters are valid.
-          else if (!((facilityCode>=0) && (facilityCode<=255) && (cardNumber>=0) && (cardNumber<=65535))) {            
+          else if (!((facilityCode>=0) && (facilityCode<=255) && (cardNumber>=0) && (cardNumber<=65535))) {
             apiResponse(false, out_of_bounds);
             return;
           }
           // And if so, execute the command and tell user if it successful or not.
-          else if(!doorManager.swipeCard(doorId, id, facilityCode, cardNumber)) {        
+          else if(!doorManager.swipeCard(doorId, id, facilityCode, cardNumber)) {
             apiResponse(false, id_not_found);
             return;
           }
         break;
-     
+
       // Enter pin command
       case ENTERPIN:
-        if (!doorManager.enterPIN(doorId, id, pin)) {        
+        if (!doorManager.enterPIN(doorId, id, pin)) {
           apiResponse(false, id_not_found);
           return;
-        } 
-        break;
-     
-      // Open door command
-      case OPENDOOR:
-        if (!doorManager.openDoor(doorId, id)) {        
-          apiResponse(false, id_not_found);
-          return;        
-        } 
-        break;
-     
-     // Close door command
-      case CLOSEDOOR:
-        if (!doorManager.closeDoor(doorId, id)) {        
-          apiResponse(false, id_not_found);
-          return;        
         }
         break;
-     
+
+      // Open door command
+      case OPENDOOR:
+        if (!doorManager.openDoor(doorId, id)) {
+          apiResponse(false, id_not_found);
+          return;
+        }
+        break;
+
+     // Close door command
+      case CLOSEDOOR:
+        if (!doorManager.closeDoor(doorId, id)) {
+          apiResponse(false, id_not_found);
+          return;
+        }
+        break;
+
       // Push REX command
       case PUSHREX:
-        if (!doorManager.pushREX(doorId, id)) {        
+        if (!doorManager.pushREX(doorId, id)) {
           apiResponse(false, id_not_found);
           return;
-        }        
-        break;      
-      
+        }
+        break;
+
       // Activate Input command
       case ACTIVATEINPUT:
-        if (!doorManager.activateInput(doorId, id)) {        
+        if (!doorManager.activateInput(doorId, id)) {
           apiResponse(false, id_not_found);
           return;
-        }        
-        break;      
-      
+        }
+        break;
+
       // Deactivate Input command
       case DEACTIVATEINPUT:
-        if (!doorManager.deactivateInput(doorId, id)) {        
+        if (!doorManager.deactivateInput(doorId, id)) {
           apiResponse(false, id_not_found);
           return;
-        }        
-        break;      
-      
+        }
+        break;
+
       // Get peripheral state command
       case GETPERIPHERALSTATE:
         {
           int isActive = doorManager.isPeripheralActive(doorId, id);
-          if (isActive == -1) {        
-            apiResponse(false, id_not_found);          
+          if (isActive == -1) {
+            apiResponse(false, id_not_found);
           }
           else if (isActive) {
-            apiResponse(true, peripheral_is_active);          
+            apiResponse(true, peripheral_is_active);
           }
           else {
-            apiResponse(true, peripheral_is_inactive);          
+            apiResponse(true, peripheral_is_inactive);
           }
-          return;  
+          return;
         }
 
       case UNDEFINED:
@@ -1188,9 +1189,9 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
 
 
 /* *****************************************************************************************************
-* 
+*
 * PACS Section
-* 
+*
 ***************************************************************************************************** */
 
 /*
@@ -1198,23 +1199,23 @@ void apiCMD(WebServer &server, WebServer::ConnectionType type, char *url_tail, b
 * Called whenever a peripheral has changed pin levels.
 */
 void onStateChange(PACSDoor &door, PACSPeripheral &p) {
-  
+
   aJsonObject *root, *update;
 
-  root = aJson.createObject();  
-  aJson.addItemToObject(root, "Update", update = aJson.createObject());    
+  root = aJson.createObject();
+  aJson.addItemToObject(root, "Update", update = aJson.createObject());
   aJson.addStringToObject(update, "DoorId", door.id);
   aJson.addStringToObject(update, "Id", p.id);
 
-  switch (p.type) {        
+  switch (p.type) {
     case GREENLED:
     case BEEPER:
     case DOORMONITOR:
     case REX:
-    case LOCK:  
+    case LOCK:
     case DIGITAL_INPUT:
-    case DIGITAL_OUTPUT:  
-  
+    case DIGITAL_OUTPUT:
+
       cout << "[" << door.id << "|" << p.id << "]: ";
 
       if (p.isActive()) {
@@ -1225,19 +1226,19 @@ void onStateChange(PACSDoor &door, PACSPeripheral &p) {
         cout << F("is INACTIVE\n");
         aJson.addBooleanToObject(update, "IsActive", false);
       }
-  
+
       break;
-    
+
     default:
       cout << "[" << door.id << "|" << p.id << "]: Unknown periperhal";
       break;
-  }  
-  
-  // Render the JSON string. 
+  }
+
+  // Render the JSON string.
   char *json_string = aJson.print(root);
 
-  // Send the update over websocket connection.  
-  if (websocketServer.isConnected()) { 
+  // Send the update over websocket connection.
+  if (websocketServer.isConnected()) {
     websocketServer.sendMessage(json_string, strlen(json_string));
   }
 
@@ -1260,9 +1261,9 @@ void renewDHCP() {
 
 
 /* ****************************************************************************************************
-* 
+*
 * WebSocket Section
-* 
+*
 ***************************************************************************************************** */
 
 // Global timer for timed events.
@@ -1301,16 +1302,16 @@ void onHeartbeatResponse(WebSocket &socket) {
 /*
 * sendHeartbeat()
 * Check that the connected client is still alive by sending a heartbeat (websocket ping) and
-* wait for a pong reply. 
+* wait for a pong reply.
 */
 void sendHeartbeat() {
 
-  if (websocketServer.isConnected()) {     
+  if (websocketServer.isConnected()) {
     if (!heartbeatAcknowledged) {
       cout << F("No heartbeat acknowledgedment received.\n");
     }
-    websocketServer.sendHeartbeat();      
-    // Start the timeout timer, if not started. 
+    websocketServer.sendHeartbeat();
+    // Start the timeout timer, if not started.
     if (heartbeatTimeoutTimer == -1) {
       heartbeatTimeoutTimer = timer.setTimeout(HEARTBEAT_TIMEOUT*1000, onHeartbeatTimeout);
     }
@@ -1320,22 +1321,22 @@ void sendHeartbeat() {
 
 /*
 * onConnect()
-* Is called whenever there is a new websocket connection (there can be only 
+* Is called whenever there is a new websocket connection (there can be only
 * one connection at any given time.)
 */
-void onConnect(WebSocket &socket) {  
+void onConnect(WebSocket &socket) {
   cout << F("Websocket connection.\n");
-  
+
   if (sendHeartbeatTimer != -1) {
    timer.deleteTimer(sendHeartbeatTimer);
    sendHeartbeatTimer = -1;
- } 
+ }
  sendHeartbeatTimer = timer.setInterval(HEARTBEAT_INTERVAL*1000, sendHeartbeat);
 }
 
 /*
 * onDisconnect()
-* Is called when the websocket connection is disconnected. 
+* Is called when the websocket connection is disconnected.
 */
 void onDisconnect(WebSocket &socket) {
   timer.deleteTimer(heartbeatTimeoutTimer);
@@ -1347,12 +1348,12 @@ void onDisconnect(WebSocket &socket) {
 
 /*
 * onData()
-* Is called whenever there is a new data available in the websocket pipe. 
+* Is called whenever there is a new data available in the websocket pipe.
 */
 void onData(WebSocket &socket, char* dataString, unsigned short frameLength) {
 
   // Parse the JSON data into an object tree.
-  aJsonObject* root = aJson.parse(dataString);  
+  aJsonObject* root = aJson.parse(dataString);
 
   if (root == NULL) {
     cout << F("Data is not valid JSON.\n");
@@ -1366,20 +1367,20 @@ void onData(WebSocket &socket, char* dataString, unsigned short frameLength) {
   // RequestUpdate command
   //
   if (strcmp(cmd->name, "RequestUpdate") == 0) {
-    for (unsigned i=0; i < doorManager.doors.size(); i++) {        
+    for (unsigned i=0; i < doorManager.doors.size(); i++) {
       for (unsigned j=0; j < doorManager.doors[i].peripherals.size(); j++) {
         onStateChange(doorManager.doors[i], doorManager.doors[i].peripherals[j]);
       }
     }
     aJson.deleteItem(root);
-    return; 
+    return;
   }
-  
+
   //
   // UpdateNetworkSettings
   //
   if (strcmp(cmd->name, "UpdateNetworkSettings") == 0) {
-    
+
     network.settingsFromJSON(cmd->child);
     network.printConfiguration();
     //The new configuration will not take effect until next reset.
@@ -1394,36 +1395,36 @@ void onData(WebSocket &socket, char* dataString, unsigned short frameLength) {
     cout << F("Command, door-id and/or id not present in JSON structure.") << endl;
     aJson.deleteItem(root);
     return;
-  }        
+  }
 
   //
   // SwipeCard command
   //
   if (strcmp(cmd->name, "SwipeCard") == 0) {
     aJsonObject* facilityCode = aJson.getObjectItem(cmd, "FacilityCode");
-    aJsonObject* cardNumber = aJson.getObjectItem(cmd, "CardNumber");  
-    
+    aJsonObject* cardNumber = aJson.getObjectItem(cmd, "CardNumber");
+
     if (facilityCode == NULL || cardNumber == NULL) {
       cout << F("Facility Code and/or cardNumber not present in JSON structure.") << endl;
       aJson.deleteItem(root);
       return;
-    }        
-    doorManager.swipeCard(doorId->valuestring, id->valuestring, 
+    }
+    doorManager.swipeCard(doorId->valuestring, id->valuestring,
                           atoi(facilityCode->valuestring), atoi(cardNumber->valuestring));
   }
-  
+
   //
   // EnterPIN command
   //
   else if (strcmp(cmd->name, "EnterPIN") == 0) {
-    aJsonObject* pin = aJson.getObjectItem(cmd, "PIN");  
+    aJsonObject* pin = aJson.getObjectItem(cmd, "PIN");
     if (pin == NULL) {
       cout << F("PIN not present in JSON structure.") << endl;
       aJson.deleteItem(root);
       return;
-    }        
+    }
     doorManager.enterPIN(doorId->valuestring, id->valuestring, pin->valuestring);
-  }  
+  }
 
   //
   // OpenDoor command
@@ -1463,29 +1464,29 @@ void onData(WebSocket &socket, char* dataString, unsigned short frameLength) {
   //
   // Not a recognized command.
   //
-  else {    
+  else {
     cout << F("Unkown command.") << cmd->name << endl;
   }
 
   aJson.deleteItem(root);
 }
 
-/* 
+/*
 * Setup() is where the Arduino starts executing code.
 * We setup our network, doors, servers and other stuff here.
 */
 void setup()
 {
   Serial.begin(SERIAL_BAUD);
-  
+
   cout << F("\n*************************************\n");
   cout << F("*  SETUP\n");
   cout << F("*************************************\n\n");
- 
-  // Setup SD card and initialize the Ethernet adapter 
+
+  // Setup SD card and initialize the Ethernet adapter
   // with the settings from eeprom.
   pinMode(SS_HARDWARE_PIN, OUTPUT);
-  setupSDCard();  
+  setupSDCard();
   delay(200);
 
   //
@@ -1493,16 +1494,16 @@ void setup()
   //
   cout << F("Loading pin configuration.\n");
   if (!loadPinMappingsFromFile(pinsConfigFilename))
-    while (true) delay(100); 
+    while (true) delay(100);
   cout << F("Loading door configuration.\n");
   if (!loadDoorConfigurationFromFile(doorsConfigFilename))
-    while (true) delay(100); 
-  
+    while (true) delay(100);
+
   // Door configuration is loaded! Now initialize all the doors and their
   // peripherals/readers. This sets correct pinmode, active-level etc.
   doorManager.initializeDoors();
-  doorManager.registerStateChangeCallback(&onStateChange);  
-  
+  doorManager.registerStateChangeCallback(&onStateChange);
+
   cout << F("\n*************************************\n");
   cout << F("*  DOOR CONFIGURATION\n");
   cout << F("*************************************\n\n");
@@ -1515,14 +1516,14 @@ void setup()
   cout << F("Setting up the network.\n");
   network.setup();
   digitalWrite(ETHERNET_SELECT_PIN, HIGH);
-  
+
   cout << F("\n*************************************\n");
   cout << F("*  NETWORK CONFIGURATION\n");
   cout << F("*************************************\n\n");
   network.printConfiguration();
 
 #ifdef BONJOUR_ENABLED
-  // Start the bonjour/zeroconf service.  
+  // Start the bonjour/zeroconf service.
   char* bonjour_hostname = "pacsis";
   EthernetBonjour.begin(bonjour_hostname);
   EthernetBonjour.addServiceRecord("Pacsis._ws", network.websocketPort, MDNSServiceTCP);
@@ -1530,12 +1531,12 @@ void setup()
 #endif
 
   // Setup the server and the routes and begin listening for incoming connections.
-  webserver = new WebServer("", network.httpPort);  
+  webserver = new WebServer("", network.httpPort);
   webserver->setDefaultCommand(&defaultHTML); // Root url.
   webserver->setUrlPathCommand(&webAppFile); // All web files on SD card.
   webserver->setFailureCommand(&errorHTML); // HTTP 400.
   webserver->addCommand("api", &apiCMD); // API route.
-  
+
   webserver->begin();
 
   // Setup the websocket server and start listening for incoming connections.
@@ -1547,11 +1548,11 @@ void setup()
   websocketServer.begin();
 
   // Register timed events.
-  dhcpRenewalTimer = timer.setInterval(network.dhcp_refresh_minutes*60000, renewDHCP);    
+  dhcpRenewalTimer = timer.setInterval(network.dhcp_refresh_minutes*60000, renewDHCP);
   int freememTimer = timer.setInterval(5000, freeMem);
   #ifdef BONJOUR_ENABLED
     bonjourTimer = timer.setInterval(500, updateBonjour);
-  #endif  
+  #endif
 
   cout << F("\n*************************************\n");
   cout << F("*  MAIN LOOP\n");
@@ -1565,7 +1566,7 @@ void loop() {
 
   // Poll the timer
   timer.run();
-  
+
   // Process incoming web-server connections.
   char buff[200];
   int len = 200;
@@ -1574,7 +1575,7 @@ void loop() {
   // Listen for data on websocket connection.
   websocketServer.listen();
 
-  // Checks if any pins have altered states, and notifies 
+  // Checks if any pins have altered states, and notifies
   // the registered callbacks.
   doorManager.updateLevels();
 }
