@@ -27,18 +27,18 @@ WebSocket::WebSocket(const char *urlPrefix, int inPort) :
 }
 
 void WebSocket::begin() {
-    server.begin();      
+    server.begin();
 }
 
 void WebSocket::listen() {
-    
-    if (server.available()) {
+
+    if (client = server.available()) {
         // No active connection available. Treat this as a handshake request.
         if (state == DISCONNECTED) {
             bool handshakeSuccessful = processHandshake();
-            
+
             if (handshakeSuccessful) {
-                state = CONNECTED;                    
+                state = CONNECTED;
                 // Call the registered callback.
                 if (onConnect) {
                     onConnect(*this);
@@ -46,13 +46,13 @@ void WebSocket::listen() {
             } else {
                 cout << F("WEBSOCKET: Handshake unsuccessful.\n");
             }
-        } 
+        }
         else if (state == CONNECTED || state == CLOSING) {
             bool validFrame = getFrame();
 
             // We check the frame to see that it was valid, and disconnect
             // if it was not.
-            if (!validFrame) {                
+            if (!validFrame) {
             	cout << F("WEBSOCKET: Got invalid frame. Disconnecting.\n");
                 disconnect();
             }
@@ -81,7 +81,7 @@ bool WebSocket::processHandshake() {
     char temp[128];
     char key[80];
     char bite;
-    
+
     bool hasUpgrade = false;
     bool hasConnection = false;
     bool isSupportedVersion = false;
@@ -90,19 +90,21 @@ bool WebSocket::processHandshake() {
     bool hasKey = false;
 
     byte counter = 0;
-    
-    cout << F("WEBSOCKET: Processing handshake\n");
+
+    cout << F("WEBSOCKET: Processing handshake\t size:");
+    cout << client.available();
+    cout << F("\n");
     while ((bite = client.read()) != -1) {
         temp[counter++] = bite;
 
-        if (bite == '\n' || counter > 127) { // EOL got, or too long header. temp should now contain a header string
-            temp[counter - 2] = 0; // Terminate string before CRLF                    
+        if (bite == '\n' || counter > 128) { // EOL got, or too long header. temp should now contain a header string
+            temp[counter - 2] = 0; // Terminate string before CRLF
 
             // Ignore case when comparing and allow 0-n whitespace after ':'. See the spec:
             // http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html
             if (!hasUpgrade && strstr(temp, "Upgrade:")) {
                 // OK, it's a websockets handshake for sure
-                hasUpgrade = true;	
+                hasUpgrade = true;
             } else if (!hasConnection && strstr(temp, "Connection: ")) {
                 hasConnection = true;
             } else if (!hasOrigin && strstr(temp, "Origin:")) {
@@ -116,7 +118,7 @@ bool WebSocket::processHandshake() {
             } else if (!isSupportedVersion && strstr(temp, "Sec-WebSocket-Version: ") && strstr(temp, "13")) {
                 isSupportedVersion = true;
             }
-            
+
             cout << temp;
             counter = 0; // Start saving new header string
         }
@@ -155,7 +157,7 @@ bool WebSocket::processHandshake() {
         // Nope, failed handshake. Disconnect
         return false;
     }
-    
+
     return true;
 }
 
@@ -163,13 +165,13 @@ bool WebSocket::processHandshake() {
 bool WebSocket::getFrame() {
     byte bite;
     unsigned short payloadLength = 0;
-    
-    bite = client.read();        
+
+    bite = client.read();
     frame.opcode = bite & 0xf; // Opcode
     frame.isFinal = bite & 0x80; // Final frame?
     // Determine length (only accept <= 126, i.e. maximum 65535 bytes. Need to cap this in-code.)
     bite = client.read();
-    frame.length = bite & 0x7f; // Length of payload        
+    frame.length = bite & 0x7f; // Length of payload
     frame.isMasked = bite & 0x80;
 
     // Frame complete!
@@ -192,7 +194,7 @@ bool WebSocket::getFrame() {
         }
 
         close(WS_PAYLOAD_TOO_BIG, "Maximum payload is 1024 bytes.");
-       
+
         return false;
     }
 
@@ -202,10 +204,10 @@ bool WebSocket::getFrame() {
         byte exLengthByte1 = client.read();
         byte exLengthByte2 = client.read();
         payloadLength = (exLengthByte1 << 8) + exLengthByte2;
-     } 
+     }
      // If frame length is less than 126, that is the size of the payload.
      else {
-        payloadLength = frame.length;        
+        payloadLength = frame.length;
      }
 
      // Check if our buffer can store the payload.
@@ -215,18 +217,18 @@ bool WebSocket::getFrame() {
              << MAX_RECEIVE_MESSAGE_SIZE << F(" bytes.\n");
 
         close(WS_PAYLOAD_TOO_BIG, "Maximum payload is 2048 bytes.");
-        
+
         return false;
      }
 
-    // Client should always send mask, but check just to be sure    
+    // Client should always send mask, but check just to be sure
     if (frame.isMasked) {
         frame.mask[0] = client.read();
         frame.mask[1] = client.read();
         frame.mask[2] = client.read();
         frame.mask[3] = client.read();
     }
-    
+
     // Get message bytes and unmask them if necessary
     for (int i = 0; i < payloadLength; i++) {
         if (frame.isMasked) {
@@ -237,9 +239,9 @@ bool WebSocket::getFrame() {
     }
 
     switch (frame.opcode) {
-        
-        case FRAME_OP_PONG:            
-            if (onHeartbeatResponse && (strstr(frame.data, HEARTBEAT_MESSAGE) != NULL)) {            
+
+        case FRAME_OP_PONG:
+            if (onHeartbeatResponse && (strstr(frame.data, HEARTBEAT_MESSAGE) != NULL)) {
                 onHeartbeatResponse(*this);
             }
             break;
@@ -250,36 +252,36 @@ bool WebSocket::getFrame() {
                 onData(*this, frame.data, payloadLength);
             }
             break;
-            
+
         case FRAME_OP_CLOSE:
 
             // If we are already closing, the received close frame is hopefully a reply to a previous
-            // close frame we sent. 
+            // close frame we sent.
             // TODO: Check that the received close frame is a copy of ours.
             if (state == CLOSING) {
                 disconnect();
-                cout << F("WEBSOCKET: Close response received. Terminating connection.\n");    
+                cout << F("WEBSOCKET: Close response received. Terminating connection.\n");
             }
-            // In this case, the client wants to close, so we echo back the close frame and 
-            // disconnect.     
+            // In this case, the client wants to close, so we echo back the close frame and
+            // disconnect.
             else {
-                cout << F("WEBSOCKET: Close frame received. Closing in answer.\n");                
+                cout << F("WEBSOCKET: Close frame received. Closing in answer.\n");
                 // TODO: How do we echo back the close frame?
                 // First two bytes in payload is a two-byte close code.
                 uint16_t closeStatusCode = frame.data[0] << 8 | frame.data[1];
                 close(closeStatusCode, "");
                 disconnect();
             }
-            
+
             break;
 
         //Unhandled
         case FRAME_OP_CONT:
         case FRAME_OP_BINARY:
-        case FRAME_OP_PING:        
+        case FRAME_OP_PING:
             cout << F("WEBSOCKET: Unsupported frame.\n");
             return false;
-            
+
         default:
             // Unexpected.
     		cout << F("WEBSOCKET: Unhandled frame.\n");
@@ -302,15 +304,15 @@ void WebSocket::registerHeartbeatResponseCallback(Callback *callback) {
     onHeartbeatResponse = callback;
 }
 
-void WebSocket::close(uint16_t statusCode, char *reason) {    
-    
+void WebSocket::close(uint16_t statusCode, char *reason) {
+
     client.write(FRAME_OP_CLOSE);
     if (statusCode) {
         client.write(statusCode);
     }
     if (reason) {
         for (int i = 0; i < strlen(reason); i++) {
-            client.write(reason[i]);            
+            client.write(reason[i]);
         }
     }
     state = CLOSING;
@@ -337,12 +339,12 @@ bool WebSocket::send(uint8_t opCode, char *payload, uint16_t payloadLength) {
         //
         // First byte, always FIN, as we don't support anything else.
         //
-        server.write((uint8_t)FRAME_FLAG_FIN | opCode); 
-        
+        server.write((uint8_t)FRAME_FLAG_FIN | opCode);
+
         //
-        // Second byte, mask and length of payload.            
+        // Second byte, mask and length of payload.
         //
-        
+
         // If no payload, make sure the length of the payload is 0.
         if (payload == NULL) {
             payloadLength = 0;
@@ -353,30 +355,30 @@ bool WebSocket::send(uint8_t opCode, char *payload, uint16_t payloadLength) {
             server.write((uint8_t) payloadLength);
         }
         // If payload size is between 126 and 65535, 126 is the value to add in the payload-length header field.
-        // In this case, the following 2 bytes in the header contain the  actual payload length. 
+        // In this case, the following 2 bytes in the header contain the  actual payload length.
         else if ((payloadLength >= 126) && (payloadLength <= 65535)) {
             server.write(126);
             byte exLengthByte2 = (byte)(payloadLength & 0xFF);
-            byte exLengthByte1 = (byte)((payloadLength >> 8) & 0xFF);            
+            byte exLengthByte1 = (byte)((payloadLength >> 8) & 0xFF);
             server.write(exLengthByte1);
             server.write(exLengthByte2);
         }
         // We definately don't handle messages that are bigger than 65535.
         else {
             cout << F("WEBSOCKET: Message is too big to send.")
-                 << F("Only messages up to 65535 bytes in size are supported.\n");            
+                 << F("Only messages up to 65535 bytes in size are supported.\n");
             return false;
-        }                
-        
+        }
+
         //
         // Header is finished, now we write the actual payload.
         //
         for (int i = 0; i < payloadLength ; i++) {
-            server.write(payload[i]);            
+            server.write(payload[i]);
         }
         return true;
     }
-    cout << F("WEBSOCKET: No connection to client, no data sent.\n");   
+    cout << F("WEBSOCKET: No connection to client, no data sent.\n");
     return false;
 }
 

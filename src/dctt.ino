@@ -17,7 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 // Serial baudrate of the Arduino.
-#define SERIAL_BAUD 57600
+#define SERIAL_BAUD 115200
 
 // Websocket heartbeats.
 #define HEARTBEAT_INTERVAL 5
